@@ -35,6 +35,7 @@ class Blockchain:
 
     @staticmethod
     def hash(block):
+        print(json.dumps(block, sort_keys=True).encode())
         return hashlib.sha256(
             json.dumps(block, sort_keys=True).encode()
         ).hexdigest()
@@ -55,3 +56,13 @@ class Blockchain:
         return hashlib.sha256(
             f'{last_proof}{proof}'.encode()
         ).hexdigest()[0:4] == '0000'
+
+
+a = Blockchain()
+a.hash({
+            'index': 1,
+            'timestamp': 1,
+            'transactions': 1,
+            'proof': 1,
+            'previous_hash': 1
+        })

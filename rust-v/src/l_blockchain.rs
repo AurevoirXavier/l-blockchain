@@ -1,21 +1,22 @@
+use std::fmt;
 use std::time::SystemTime;
 
-use serde_json;
+//use serde_json;
 
-#[derive(Serialize, Deserialize)]
+//#[derive(Serialize, Deserialize)]
 struct Sender {}
 
-#[derive(Serialize, Deserialize)]
+//#[derive(Serialize, Deserialize)]
 struct Recipient {}
 
-#[derive(Serialize, Deserialize)]
+//#[derive(Serialize, Deserialize)]
 struct Transaction {
     sender: Sender,
     recipient: Recipient,
     amount: f64,
 }
 
-#[derive(Serialize, Deserialize)]
+//#[derive(Serialize, Deserialize)]
 struct Block {
     index: u32,
     timestamp: SystemTime,
@@ -53,10 +54,32 @@ impl Block {
 
         let mut hasher = Sha256::default();
         hasher.input(
-            serde_json::to_string(block).unwrap().as_bytes()
+            block.to_string().as_bytes()
         );
 
         hasher.result().as_slice().to_hex()
+    }
+}
+
+impl fmt::Display for Block {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let Block {
+            index,
+            timestamp,
+            transactions,
+            proof,
+            previous_hash
+        } = self;
+
+        writeln!(
+            f,
+            r#"{{"index": {}, "previous_hash": {}, "proof": {}, "timestamp": {}, "transactions": {}}}"#,
+            index,
+            previous_hash,
+            proof,
+            1,
+            1
+        )
     }
 }
 
