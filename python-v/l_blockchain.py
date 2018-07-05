@@ -1,3 +1,5 @@
+import hashlib
+import json
 from time import time
 
 
@@ -6,14 +8,21 @@ class Blockchain:
         self.chain = []
         self.current_transactions = []
 
+        self.new_block(proof=100, previous_hash=1)
+
     def new_block(self, proof, previous_hash=None):
         block = {
             'index': len(self.chain) + 1,
             'timestamp': time(),
             'transactions': self.current_transactions,
             'proof': proof,
-            'previous_hash': previous_hash or self.hash(self.chain[-1])
+            'previous_hash': previous_hash or self.hash(self.last_block)
         }
+
+        self.current_transactions = []
+        self.chain.append(block)
+
+        return block
 
     def new_transaction(self, sender, recipient, amount) -> int:
         self.current_transactions.append({
@@ -26,8 +35,23 @@ class Blockchain:
 
     @staticmethod
     def hash(block):
-        pass
+        return hashlib.sha256(
+            json.dumps(block, sort_keys=True).encode()
+        ).hexdigest()
 
     @property
     def last_block(self):
-        pass
+        return self.chain[-1]
+
+    def proof_of_work(self, last_proof: int) -> int:
+        proof = 0
+
+        while self.valid_proof(last_proof, proof) is False:
+            proof += 1
+
+        return proof
+
+    def valid_proof(self, last_proof, proof: int) -> bool:
+        return hashlib.sha256(
+            f'{last_proof}{proof}'.encode()
+        ).hexdigest()[0:4] == '0000'
