@@ -1,7 +1,4 @@
-use std::fmt;
-use std::time::SystemTime;
-
-//use serde_json;
+use serde_json;
 
 fn sha256(input: &[u8]) -> String {
     use sha2::{Sha256, Digest};
@@ -13,23 +10,30 @@ fn sha256(input: &[u8]) -> String {
     hasher.result().as_slice().to_hex()
 }
 
-//#[derive(Serialize, Deserialize)]
+fn timestamp() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+    format!("{}.{}", timestamp.as_secs(), timestamp.subsec_micros())
+}
+
+#[derive(Serialize, Deserialize)]
 struct Sender {}
 
-//#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct Recipient {}
 
-//#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct Transaction {
     sender: Sender,
     recipient: Recipient,
     amount: f64,
 }
 
-//#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct Block {
     index: u32,
-    timestamp: SystemTime,
+    timestamp: String,
     transactions: Vec<Transaction>,
     proof: u32,
     previous_hash: String,
@@ -44,44 +48,22 @@ impl Block {
     fn new(blockchain: &mut Blockchain, proof: u32, previous_hash: Option<String>) -> &Block {
         use std::mem::replace;
 
+
+
         let block = Block {
             index: blockchain.chain.len() as u32 + 1,
-            timestamp: SystemTime::now(),
+            timestamp: timestamp(),
             transactions: replace(&mut blockchain.current_transactions, vec![]),
             proof,
             previous_hash: if let Some(val) = previous_hash { val } else {
-                sha256(
+                sha256(serde_json::to_string(
                     blockchain.last_block()
-                        .to_string()
-                        .as_bytes()
-                )
+                ).unwrap().as_bytes())
             },
         };
 
         blockchain.chain.push(block);
         blockchain.last_block()
-    }
-}
-
-impl fmt::Display for Block {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Block {
-            index,
-            timestamp,
-            transactions,
-            proof,
-            previous_hash
-        } = self;
-
-        writeln!(
-            f,
-            r#"{{"index": {}, "previous_hash": {}, "proof": {}, "timestamp": {}, "transactions": {}}}"#,
-            index,
-            previous_hash,
-            proof,
-            1,
-            1
-        )
     }
 }
 
@@ -97,7 +79,7 @@ impl Blockchain {
 
     pub fn proof_of_work(&self, last_proof: u32) -> u32 {
         for proof in 0u32.. {
-            if Blockchain::valid_proof(last_proof, proof) { return proof; }
+            if Blockchain::valid_proof(last_proof, proof) { println!("{}", proof);return proof; }
         }
 
         unreachable!()
@@ -122,4 +104,9 @@ impl Transaction {
 
         blockchain.last_block().index as u32 + 1
     }
+}
+
+#[get("/mine")]
+pub fn mine() -> &'static str {
+    "We'll mine a block"
 }

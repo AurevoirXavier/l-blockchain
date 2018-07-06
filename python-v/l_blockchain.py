@@ -1,12 +1,17 @@
 import hashlib
 import json
+
 from time import time
+from urllib.parse import urlparse
+
+from flask import Flask, jsonify, request
 
 
 class Blockchain:
     def __init__(self):
         self.chain = []
         self.current_transactions = []
+        self.nodes = set()
 
         self.new_block(proof=100, previous_hash=1)
 
@@ -35,7 +40,6 @@ class Blockchain:
 
     @staticmethod
     def hash(block):
-        print(json.dumps(block, sort_keys=True).encode())
         return hashlib.sha256(
             json.dumps(block, sort_keys=True).encode()
         ).hexdigest()
@@ -58,11 +62,44 @@ class Blockchain:
         ).hexdigest()[0:4] == '0000'
 
 
-a = Blockchain()
-a.hash({
-            'index': 1,
-            'timestamp': 1,
-            'transactions': 1,
-            'proof': 1,
-            'previous_hash': 1
-        })
+app = Flask(__name__)
+blockchain = Blockchain()
+
+
+@app.route('/transactions/new', methods=['POST'])
+def new_transaction():
+    values = request.get_json()
+    required = ['sender', 'recipient', 'amount']
+
+    if values is None:
+        return 'Missing values', 400
+
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    index = blockchain.new_transaction(
+        values['sender'],
+        values['recipient'],
+        values['amount']
+    )
+
+    return jsonify({
+        'message': f'Transaction will be added to Block {index}'
+    }), 201
+
+
+@app.route('/mine', methods=['GET'])
+def mine():
+    return 'We\'ll mine a new block'
+
+
+@app.route('/chain', methods=['GET'])
+def full_chain():
+    return jsonify({
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain)
+    }), 200
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
