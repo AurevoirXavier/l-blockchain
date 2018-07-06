@@ -1,7 +1,10 @@
-#![feature(plugin)]
+#![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
 
 extern crate rocket;
+#[macro_use]
+extern crate rocket_contrib;
+
 extern crate rustc_serialize;
 
 extern crate serde;
@@ -14,10 +17,15 @@ extern crate sha2;
 mod l_blockchain;
 
 fn main() {
+    use std::sync::Mutex;
     use l_blockchain;
-    let mut blockchain = l_blockchain::Blockchain::new();
 
-    rocket::ignite().mount("/", routes![
-       l_blockchain::mine
-    ]).launch();
+    rocket::ignite()
+        .mount("/", routes![
+            l_blockchain::new_transaction,
+            l_blockchain::mine,
+            l_blockchain::full_chain
+        ])
+        .manage(Mutex::new(l_blockchain::Blockchain::new()))
+        .launch();
 }
