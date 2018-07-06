@@ -11,4 +11,5 @@ mod l_blockchain;
 
 fn main() {
     let blockchain = l_blockchain::Blockchain::new();
+    blockchain.proof_of_work(100);
 }

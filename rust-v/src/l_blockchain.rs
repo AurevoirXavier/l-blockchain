@@ -3,6 +3,16 @@ use std::time::SystemTime;
 
 //use serde_json;
 
+fn sha256(input: &[u8]) -> String {
+    use sha2::{Sha256, Digest};
+    use rustc_serialize::hex::ToHex;
+
+    let mut hasher = Sha256::default();
+    hasher.input(input);
+
+    hasher.result().as_slice().to_hex()
+}
+
 //#[derive(Serialize, Deserialize)]
 struct Sender {}
 
@@ -40,24 +50,16 @@ impl Block {
             transactions: replace(&mut blockchain.current_transactions, vec![]),
             proof,
             previous_hash: if let Some(val) = previous_hash { val } else {
-                Block::hash(blockchain.last_block())
+                sha256(
+                    blockchain.last_block()
+                        .to_string()
+                        .as_bytes()
+                )
             },
         };
 
         blockchain.chain.push(block);
         blockchain.last_block()
-    }
-
-    fn hash(block: &Block) -> String {
-        use sha2::{Sha256, Digest};
-        use rustc_serialize::hex::ToHex;
-
-        let mut hasher = Sha256::default();
-        hasher.input(
-            block.to_string().as_bytes()
-        );
-
-        hasher.result().as_slice().to_hex()
     }
 }
 
@@ -92,6 +94,22 @@ impl Blockchain {
     }
 
     fn last_block(&self) -> &Block { return self.chain.last().unwrap(); }
+
+    pub fn proof_of_work(&self, last_proof: u32) -> u32 {
+        for proof in 0u32.. {
+            if Blockchain::valid_proof(last_proof, proof) { return proof; }
+        }
+
+        unreachable!()
+    }
+
+    fn valid_proof(last_proof: u32, proof: u32) -> bool {
+        &sha256(format!(
+            "{}{}",
+            last_proof,
+            proof
+        ).as_bytes())[0..4] == "0000"
+    }
 }
 
 impl Transaction {
