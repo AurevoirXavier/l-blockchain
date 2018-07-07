@@ -16,6 +16,8 @@ serde_json = "*"
 
 sha2 = "*"
 
+url = "*"
+
 uuid = { version = "*", features = ["v4"] }
 
 [profile.release]

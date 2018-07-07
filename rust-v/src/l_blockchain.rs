@@ -1,3 +1,5 @@
+// use
+use std::collections::HashSet;
 use std::sync::Mutex;
 
 use rocket::State;
@@ -5,6 +7,8 @@ use rocket_contrib::Json;
 
 use serde_json;
 
+
+// util fn
 fn sha256(input: &[u8]) -> String {
     use sha2::{Sha256, Digest};
     use rustc_serialize::hex::ToHex;
@@ -17,11 +21,14 @@ fn sha256(input: &[u8]) -> String {
 
 fn timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
+
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
     format!("{}.{}", timestamp.as_secs(), timestamp.subsec_micros())
 }
 
+
+// struct
 #[derive(Serialize, Deserialize)]
 pub struct Transaction {
     sender: String,
@@ -38,20 +45,48 @@ struct Block {
     previous_hash: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Nodes {
+    nodes: Vec<String>
+}
+
 pub struct Blockchain {
     chain: Vec<Block>,
     current_transactions: Vec<Transaction>,
+    nodes: HashSet<String>,
 }
 
+
+// impl
 impl Blockchain {
     pub fn new() -> Blockchain {
         let mut blockchain = Blockchain {
             chain: vec![],
             current_transactions: vec![],
+            nodes: HashSet::new(),
         };
 
         blockchain.new_block(100, Some("1".to_owned()));
         blockchain
+    }
+
+    fn register_node(&mut self, node: String) {
+        use url::Url;
+
+        let url = Url::parse(&node).unwrap();
+        let mut node = url.host_str().unwrap().to_owned();
+
+        if let Some(port) = url.port() { node.push_str(&format!(":{}", port)) }
+
+        self.nodes.insert(node);
+    }
+
+    fn valid_chain(&mut self, chain: Vec<Block>) -> bool {
+        unimplemented!()
+    }
+
+    fn resolve_conflicts(&mut self) -> bool{
+        unimplemented!()
     }
 
     fn new_block(&mut self, proof: u32, previous_hash: Option<String>) -> &Block {
@@ -98,9 +133,12 @@ impl Blockchain {
     }
 }
 
+
+// rocket manager
 type BcMgr = Mutex<Blockchain>;
 type NodeIdentifier = Mutex<String>;
 
+// rocket route
 #[post("/transactions/new", format = "application/json", data = "<transaction>")]
 pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
     let Transaction {
@@ -146,5 +184,18 @@ pub fn full_chain(bc_mgr: State<BcMgr>) -> Json {
     Json(json!({
         "chain": chain,
         "length": chain.len()
+    }))
+}
+
+#[post("/nodes/register", format = "application/json", data = "<nodes>")]
+pub fn register_nodes(nodes: Json<Nodes>, bc_mgr: State<BcMgr>) -> Json {
+    let Nodes { nodes } = nodes.0;
+    let mut blockchain = bc_mgr.lock().unwrap();
+
+    for node in nodes { blockchain.register_node(node); }
+
+    Json(json!({
+        "message": "Nodes have been added",
+        "total_nodes": blockchain.nodes
     }))
 }
