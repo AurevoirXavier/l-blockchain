@@ -10,7 +10,7 @@ use rocket_contrib::Json;
 use serde_json;
 
 
-// util fn
+// global util fn
 fn sha256(input: &[u8]) -> String {
     use sha2::{Sha256, Digest};
     use rustc_serialize::hex::ToHex;
@@ -90,13 +90,13 @@ impl Blockchain {
     }
 
     fn valid_chain(&self, chain: &Vec<Block>) -> bool {
-        let mut last_block = &chain[0];
+        let mut prev_block = &chain[0];
 
         for block in &chain[1..] {
-            if block.previous_hash != sha256(serde_json::to_string(last_block).unwrap().as_bytes()) { return false; }
-            if !Blockchain::valid_proof(last_block.proof, block.proof) { return false; }
+            if block.previous_hash != sha256(serde_json::to_string(prev_block).unwrap().as_bytes()) { return false; }
+            if !Blockchain::valid_proof(prev_block.proof, block.proof) { return false; }
 
-            last_block = block
+            prev_block = block
         }
 
         true
