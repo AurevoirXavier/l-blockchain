@@ -3,6 +3,7 @@ import json
 
 from time import time
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from flask import Flask, jsonify, request
 
@@ -64,6 +65,7 @@ class Blockchain:
 
 app = Flask(__name__)
 blockchain = Blockchain()
+node_identifier = str(uuid4()).replace('-', '')
 
 
 @app.route('/transactions/new', methods=['POST'])
@@ -90,7 +92,19 @@ def new_transaction():
 
 @app.route('/mine', methods=['GET'])
 def mine():
-    return 'We\'ll mine a new block'
+    proof = blockchain.proof_of_work(blockchain.last_block['proof'])
+
+    blockchain.new_transaction(sender="0", recipient=node_identifier, amount=1)
+
+    block = blockchain.new_block(proof, None)
+
+    return jsonify({
+        'message': 'New Block forged',
+        'index': block['index'],
+        'transactions': block['transactions'],
+        'proof': block['proof'],
+        'previous_hash': block['previous_hash']
+    }), 200
 
 
 @app.route('/chain', methods=['GET'])

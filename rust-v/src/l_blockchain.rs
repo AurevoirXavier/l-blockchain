@@ -1,7 +1,6 @@
 use std::sync::Mutex;
 
 use rocket::State;
-use rocket::request::Form;
 use rocket_contrib::Json;
 
 use serde_json;
@@ -44,27 +43,6 @@ pub struct Blockchain {
     current_transactions: Vec<Transaction>,
 }
 
-impl Block {
-    fn new(blockchain: &mut Blockchain, proof: u32, previous_hash: Option<String>) -> &Block {
-        use std::mem::replace;
-
-        let block = Block {
-            index: blockchain.chain.len() as u32 + 1,
-            timestamp: timestamp(),
-            transactions: replace(&mut blockchain.current_transactions, vec![]),
-            proof,
-            previous_hash: if let Some(val) = previous_hash { val } else {
-                sha256(serde_json::to_string(
-                    blockchain.last_block()
-                ).unwrap().as_bytes())
-            },
-        };
-
-        blockchain.chain.push(block);
-        blockchain.last_block()
-    }
-}
-
 impl Blockchain {
     pub fn new() -> Blockchain {
         let mut blockchain = Blockchain {
@@ -72,20 +50,41 @@ impl Blockchain {
             current_transactions: vec![],
         };
 
-        Block::new(&mut blockchain, 100, Some("1".to_string()));
-
+        blockchain.new_block(100, Some("1".to_owned()));
         blockchain
+    }
+
+    fn new_block(&mut self, proof: u32, previous_hash: Option<String>) -> &Block {
+        use std::mem::replace;
+
+        let block = Block {
+            index: self.chain.len() as u32 + 1,
+            timestamp: timestamp(),
+            transactions: replace(&mut self.current_transactions, vec![]),
+            proof,
+            previous_hash: if let Some(val) = previous_hash { val } else {
+                sha256(serde_json::to_string(self.last_block()).unwrap().as_bytes())
+            },
+        };
+
+        self.chain.push(block);
+        self.last_block()
+    }
+
+    fn new_transaction(&mut self, sender: String, recipient: String, amount: f64) -> u32 {
+        self.current_transactions.push(Transaction {
+            sender,
+            recipient,
+            amount,
+        });
+
+        self.last_block().index as u32 + 1
     }
 
     fn last_block(&self) -> &Block { return self.chain.last().unwrap(); }
 
     pub fn proof_of_work(&self, last_proof: u32) -> u32 {
-        for proof in 0u32.. {
-            if Blockchain::valid_proof(last_proof, proof) {
-                println!("{}", proof);
-                return proof;
-            }
-        }
+        for proof in 0u32.. { if Blockchain::valid_proof(last_proof, proof) { return proof; } }
 
         unreachable!()
     }
@@ -99,33 +98,50 @@ impl Blockchain {
     }
 }
 
-impl Transaction {
-    fn new(blockchain: &mut Blockchain, sender: String, recipient: String, amount: f64) -> u32 {
-        blockchain.current_transactions.push(Transaction {
-            sender,
-            recipient,
-            amount,
-        });
-
-        blockchain.last_block().index as u32 + 1
-    }
-}
-
-pub type BlockchainManager = Mutex<Blockchain>;
+type BcMgr = Mutex<Blockchain>;
+type NodeIdentifier = Mutex<String>;
 
 #[post("/transactions/new", format = "application/json", data = "<transaction>")]
-pub fn new_transaction(transaction: Json<Transaction>, blockchain_manager: State<BlockchainManager>) {
+pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
+    let Transaction {
+        sender,
+        recipient,
+        amount
+    } = transaction.0;
 
+    Json(json!({
+        "message": format!(
+           "Transaction will be added to Block {}",
+            bc_mgr
+                .lock()
+                .unwrap()
+                .new_transaction(sender, recipient, amount)
+        )
+    }))
 }
 
 #[get("/mine")]
-pub fn mine() -> &'static str {
-    "We'll mine a block"
+pub fn mine(bc_mgr: State<BcMgr>, node_identifier: State<NodeIdentifier>) -> Json {
+    let mut blockchain = bc_mgr.lock().unwrap();
+    let node_identifier = node_identifier.lock().unwrap().to_owned();
+    let proof = blockchain.proof_of_work(blockchain.last_block().proof);
+
+    blockchain.new_transaction("0".to_owned(), node_identifier, 1.);
+
+    let block = blockchain.new_block(proof, None);
+
+    Json(json!({
+        "message": "New Block forged",
+        "index": block.index,
+        "transactions": block.transactions,
+        "proof": block.proof,
+        "previous_hash": block.previous_hash
+    }))
 }
 
 #[get("/chain")]
-pub fn full_chain(blockchain_manager: State<BlockchainManager>) -> Json {
-    let chain = &blockchain_manager.lock().unwrap().chain;
+pub fn full_chain(bc_mgr: State<BcMgr>) -> Json {
+    let chain = &bc_mgr.lock().unwrap().chain;
 
     Json(json!({
         "chain": chain,
