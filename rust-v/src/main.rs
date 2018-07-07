@@ -4,6 +4,8 @@
 
 
 // crate
+extern crate reqwest;
+
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;

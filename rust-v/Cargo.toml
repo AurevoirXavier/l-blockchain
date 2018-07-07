@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Xavier Lau <c.estlavie@icloud.com>"]
 
 [dependencies]
+reqwest = "*"
+
 rocket = "*"
 rocket_codegen = "*"
 rocket_contrib = { version = "*", default-features = false, features = ["json"] }

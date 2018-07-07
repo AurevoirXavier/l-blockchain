@@ -31,7 +31,7 @@ class Blockchain:
             if not self.valid_proof(last_block['proof'], block['proof']):
                 return False
 
-            last_block = blockchain
+            last_block = block
             current_index += 1
 
         return True

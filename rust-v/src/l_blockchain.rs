@@ -2,6 +2,8 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 
+use reqwest;
+
 use rocket::State;
 use rocket_contrib::Json;
 
@@ -45,9 +47,15 @@ struct Block {
     previous_hash: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct Nodes {
     nodes: Vec<String>
+}
+
+#[derive(Deserialize)]
+struct Chain {
+    chain: Vec<Block>,
+    length: u32,
 }
 
 pub struct Blockchain {
@@ -81,12 +89,45 @@ impl Blockchain {
         self.nodes.insert(node);
     }
 
-    fn valid_chain(&mut self, chain: Vec<Block>) -> bool {
-        unimplemented!()
+    fn valid_chain(&self, chain: &Vec<Block>) -> bool {
+        let mut last_block = &chain[0];
+        let mut current_index = 1;
+
+        while current_index < chain.len() {
+            let block = &chain[current_index];
+
+            if block.previous_hash != sha256(serde_json::to_string(last_block).unwrap().as_bytes()) { return false; }
+            if !Blockchain::valid_proof(last_block.proof, block.proof) { return false; }
+
+            last_block = block;
+            current_index += 1;
+        }
+
+        true
     }
 
-    fn resolve_conflicts(&mut self) -> bool{
-        unimplemented!()
+    fn resolve_conflicts(&mut self) -> bool {
+        let nodes = &self.nodes;
+        let client = reqwest::Client::new();
+        let mut right_chain = None;
+        let mut chain_len = self.chain.len() as u32;
+
+        for node in nodes {
+            if let Ok(mut resp) = client.get(&format!("http://{}/chain", node)).send() {
+                if let Ok(Chain { chain, length }) = resp.json() {
+                    if chain_len < length && self.valid_chain(&chain) {
+                        right_chain = Some(chain);
+                        chain_len = length;
+                    }
+                }
+            }
+        }
+
+        if let Some(chain) = right_chain {
+            self.chain = chain;
+
+            true
+        } else { false }
     }
 
     fn new_block(&mut self, proof: u32, previous_hash: Option<String>) -> &Block {
