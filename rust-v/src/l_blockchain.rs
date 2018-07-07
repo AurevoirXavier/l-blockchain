@@ -10,6 +10,7 @@ use rocket_contrib::Json;
 use serde_json;
 
 
+
 // global util fn
 fn sha256(input: &[u8]) -> String {
     use sha2::{Sha256, Digest};
@@ -28,6 +29,7 @@ fn timestamp() -> String {
 
     format!("{}.{}", timestamp.as_secs(), timestamp.subsec_micros())
 }
+
 
 
 // struct
@@ -63,6 +65,7 @@ pub struct Blockchain {
     current_transactions: Vec<Transaction>,
     nodes: HashSet<String>,
 }
+
 
 
 // impl
@@ -171,11 +174,12 @@ impl Blockchain {
 }
 
 
+
 // rocket manager
 type BcMgr = Mutex<Blockchain>;
 type NodeIdentifier = Mutex<String>;
-
 // rocket route
+
 #[post("/transactions/new", format = "application/json", data = "<transaction>")]
 pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
     let Transaction {
