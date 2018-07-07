@@ -10,7 +10,6 @@ use rocket_contrib::Json;
 use serde_json;
 
 
-
 // global util fn
 fn sha256(input: &[u8]) -> String {
     use sha2::{Sha256, Digest};
@@ -29,7 +28,6 @@ fn timestamp() -> String {
 
     format!("{}.{}", timestamp.as_secs(), timestamp.subsec_micros())
 }
-
 
 
 // struct
@@ -65,7 +63,6 @@ pub struct Blockchain {
     current_transactions: Vec<Transaction>,
     nodes: HashSet<String>,
 }
-
 
 
 // impl
@@ -174,31 +171,11 @@ impl Blockchain {
 }
 
 
-
 // rocket manager
 type BcMgr = Mutex<Blockchain>;
 type NodeIdentifier = Mutex<String>;
 
-// rocket route
-#[post("/transactions/new", format = "application/json", data = "<transaction>")]
-pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
-    let Transaction {
-        sender,
-        recipient,
-        amount
-    } = transaction.0;
-
-    Json(json!({
-        "message": format!(
-           "Transaction will be added to Block {}",
-            bc_mgr
-                .lock()
-                .unwrap()
-                .new_transaction(sender, recipient, amount)
-        )
-    }))
-}
-
+// rocket get route
 #[get("/mine")]
 pub fn mine(bc_mgr: State<BcMgr>, node_identifier: State<NodeIdentifier>) -> Json {
     let mut blockchain = bc_mgr.lock().unwrap();
@@ -225,6 +202,46 @@ pub fn full_chain(bc_mgr: State<BcMgr>) -> Json {
     Json(json!({
         "chain": chain,
         "length": chain.len()
+    }))
+}
+
+#[get("/nodes/resolve")]
+pub fn consensus(bc_mgr: State<BcMgr>) -> Json {
+    let response;
+    let mut blockchain = bc_mgr.lock().unwrap();
+
+    if blockchain.resolve_conflicts() {
+        response = json!({
+            "message": "Our chain was replaced",
+            "new_chain": blockchain.chain
+        })
+    } else {
+        response = json!({
+            "message": "Our chain is authoritative",
+            "chain": blockchain.chain
+        })
+    }
+
+    Json(response)
+}
+
+// rocket get route
+#[post("/transactions/new", format = "application/json", data = "<transaction>")]
+pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
+    let Transaction {
+        sender,
+        recipient,
+        amount
+    } = transaction.0;
+
+    Json(json!({
+        "message": format!(
+           "Transaction will be added to Block {}",
+            bc_mgr
+                .lock()
+                .unwrap()
+                .new_transaction(sender, recipient, amount)
+        )
     }))
 }
 

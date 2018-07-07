@@ -45,7 +45,8 @@ fn main() {
             l_blockchain::new_transaction,
             l_blockchain::mine,
             l_blockchain::full_chain,
-            l_blockchain::register_nodes
+            l_blockchain::register_nodes,
+            l_blockchain::consensus
         ])
         .manage(Mutex::new(l_blockchain::Blockchain::new()))
         .manage(Mutex::new(Uuid::new_v4().to_string().replace("-", "")))

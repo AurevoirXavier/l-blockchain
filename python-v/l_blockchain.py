@@ -14,7 +14,7 @@ class Blockchain:
         self.current_transactions = []
         self.nodes = set()
 
-        self.new_block(proof=100, previous_hash=1)
+        self.new_block(proof=100, previous_hash='1')
 
     def register_node(self, address: str):
         self.nodes.add(urlparse(address).netloc)
@@ -178,5 +178,21 @@ def register_nodes():
     }), 201
 
 
+@app.route('/nodes/resolve', methods=['GET'])
+def consensus():
+    if blockchain.resolve_conflicts():
+        response = {
+            'message': 'Our chain was replaced',
+            'new_chain': blockchain.chain
+        }
+    else:
+        response = {
+            'message': 'Our chain is authoritative',
+            'chain': blockchain.chain
+        }
+
+    return jsonify(response), 200
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)
