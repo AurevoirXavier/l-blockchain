@@ -91,16 +91,12 @@ impl Blockchain {
 
     fn valid_chain(&self, chain: &Vec<Block>) -> bool {
         let mut last_block = &chain[0];
-        let mut current_index = 1;
 
-        while current_index < chain.len() {
-            let block = &chain[current_index];
-
+        for block in &chain[1..] {
             if block.previous_hash != sha256(serde_json::to_string(last_block).unwrap().as_bytes()) { return false; }
             if !Blockchain::valid_proof(last_block.proof, block.proof) { return false; }
 
-            last_block = block;
-            current_index += 1;
+            last_block = block
         }
 
         true
