@@ -178,8 +178,8 @@ impl Blockchain {
 // rocket manager
 type BcMgr = Mutex<Blockchain>;
 type NodeIdentifier = Mutex<String>;
-// rocket route
 
+// rocket route
 #[post("/transactions/new", format = "application/json", data = "<transaction>")]
 pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
     let Transaction {
