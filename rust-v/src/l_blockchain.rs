@@ -20,12 +20,12 @@ fn sha256(input: &[u8]) -> String {
     hasher.result().as_slice().to_hex()
 }
 
-fn timestamp() -> f64 {
+fn timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
-    timestamp.as_secs() as f64 + timestamp.subsec_micros() as f64 * 1e-6
+    format!("{}.{}", timestamp.as_secs(), timestamp.subsec_micros())
 }
 
 fn json_str<T: Serialize>(item: &T) -> String {
@@ -47,7 +47,7 @@ struct Block {
     index: u32,
     previous_hash: String,
     proof: u64,
-    timestamp: f64,
+    timestamp: String,
     transactions: Vec<Transaction>,
 }
 
@@ -145,9 +145,7 @@ impl Blockchain {
         let mut prev_block = &chain[0];
 
         for block in &chain[1..] {
-            if block.previous_hash != sha256(json_str(prev_block).as_bytes()) {
-                println!("{}", sha256(json_str(prev_block).as_bytes()));
-                return false; }
+            if block.previous_hash != sha256(json_str(prev_block).as_bytes()) { return false; }
             if !Blockchain::valid_proof(prev_block.proof, block.proof) { return false; }
 
             prev_block = block
@@ -173,8 +171,9 @@ impl Blockchain {
             }
         }
 
-        if let Some(chain) = max_chain {
-            self.chain.chain = chain;
+        if let Some(max_chain) = max_chain {
+            self.chain.chain = max_chain;
+            self.chain.length = max_chain_len;
 
             true
         } else { false }
