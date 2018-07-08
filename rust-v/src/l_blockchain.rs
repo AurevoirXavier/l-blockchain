@@ -1,4 +1,4 @@
-// use
+// --- use ---
 use std::collections::HashSet;
 use std::sync::Mutex;
 
@@ -7,10 +7,9 @@ use reqwest;
 use rocket::State;
 use rocket_contrib::Json;
 
-use serde_json;
+use serde::Serialize;
 
-
-// global util fn
+// --- global util fn ---
 fn sha256(input: &[u8]) -> String {
     use sha2::{Sha256, Digest};
     use rustc_serialize::hex::ToHex;
@@ -21,35 +20,35 @@ fn sha256(input: &[u8]) -> String {
     hasher.result().as_slice().to_hex()
 }
 
-fn timestamp() -> String {
+fn timestamp() -> f64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
-    format!("{}.{}", timestamp.as_secs(), timestamp.subsec_micros())
+    timestamp.as_secs() as f64 + timestamp.subsec_micros() as f64 * 1e-6
 }
 
+fn json_str<T: Serialize>(item: &T) -> String {
+    use serde_json;
 
-// struct
+    serde_json::to_string(item).unwrap()
+}
+
+// --- struct ---
 #[derive(Serialize, Deserialize)]
 pub struct Transaction {
-    sender: String,
-    recipient: String,
     amount: f64,
+    recipient: String,
+    sender: String,
 }
 
 #[derive(Serialize, Deserialize)]
 struct Block {
     index: u32,
-    timestamp: String,
-    transactions: Vec<Transaction>,
-    proof: u32,
     previous_hash: String,
-}
-
-#[derive(Deserialize)]
-pub struct Nodes {
-    nodes: Vec<String>
+    proof: u64,
+    timestamp: f64,
+    transactions: Vec<Transaction>,
 }
 
 #[derive(Deserialize)]
@@ -58,24 +57,77 @@ struct Chain {
     length: u32,
 }
 
+#[derive(Deserialize)]
+pub struct Nodes { nodes: Vec<String> }
+
 pub struct Blockchain {
-    chain: Vec<Block>,
+    chain: Chain,
     current_transactions: Vec<Transaction>,
     nodes: HashSet<String>,
 }
 
 
-// impl
+// --- impl ---
 impl Blockchain {
     pub fn new() -> Blockchain {
         let mut blockchain = Blockchain {
-            chain: vec![],
+            chain: Chain { chain: vec![], length: 0 },
             current_transactions: vec![],
             nodes: HashSet::new(),
         };
 
         blockchain.new_block(100, Some("1".to_owned()));
         blockchain
+    }
+
+    fn last_block(&self) -> &Block { return self.chain.chain.last().unwrap(); }
+
+    fn new_transaction(&mut self, sender: String, recipient: String, amount: f64) -> u32 {
+        self.current_transactions.push(
+            Transaction {
+                sender,
+                recipient,
+                amount,
+            }
+        );
+
+        self.last_block().index as u32 + 1
+    }
+
+    fn new_block(&mut self, proof: u64, previous_hash: Option<String>) -> &Block {
+        use std::mem::replace;
+
+        let block = Block {
+            index: self.chain.length + 1,
+            timestamp: timestamp(),
+            transactions: replace(&mut self.current_transactions, vec![]),
+            proof,
+            previous_hash: if let Some(val) = previous_hash { val } else {
+                sha256(
+                    json_str(self.last_block()
+                    ).as_bytes()
+                )
+            },
+        };
+
+        self.chain.chain.push(block);
+        self.chain.length += 1;
+
+        self.last_block()
+    }
+
+    pub fn proof_of_work(&self, last_proof: u64) -> u64 {
+        for proof in 0u64.. { if Blockchain::valid_proof(last_proof, proof) { return proof; } }
+
+        unreachable!()
+    }
+
+    fn valid_proof(last_proof: u64, proof: u64) -> bool {
+        &sha256(format!(
+            "{}{}",
+            last_proof,
+            proof
+        ).as_bytes())[0..4] == "0000"
     }
 
     fn register_node(&mut self, node: String) {
@@ -93,7 +145,9 @@ impl Blockchain {
         let mut prev_block = &chain[0];
 
         for block in &chain[1..] {
-            if block.previous_hash != sha256(serde_json::to_string(prev_block).unwrap().as_bytes()) { return false; }
+            if block.previous_hash != sha256(json_str(prev_block).as_bytes()) {
+                println!("{}", sha256(json_str(prev_block).as_bytes()));
+                return false; }
             if !Blockchain::valid_proof(prev_block.proof, block.proof) { return false; }
 
             prev_block = block
@@ -105,77 +159,34 @@ impl Blockchain {
     fn resolve_conflicts(&mut self) -> bool {
         let nodes = &self.nodes;
         let client = reqwest::Client::new();
-        let mut right_chain = None;
-        let mut chain_len = self.chain.len() as u32;
+        let mut max_chain = None;
+        let mut max_chain_len = self.chain.length;
 
         for node in nodes {
             if let Ok(mut resp) = client.get(&format!("http://{}/chain", node)).send() {
                 if let Ok(Chain { chain, length }) = resp.json() {
-                    if chain_len < length && self.valid_chain(&chain) {
-                        right_chain = Some(chain);
-                        chain_len = length;
+                    if max_chain_len < length && self.valid_chain(&chain) {
+                        max_chain = Some(chain);
+                        max_chain_len = length;
                     }
                 }
             }
         }
 
-        if let Some(chain) = right_chain {
-            self.chain = chain;
+        if let Some(chain) = max_chain {
+            self.chain.chain = chain;
 
             true
         } else { false }
     }
-
-    fn new_block(&mut self, proof: u32, previous_hash: Option<String>) -> &Block {
-        use std::mem::replace;
-
-        let block = Block {
-            index: self.chain.len() as u32 + 1,
-            timestamp: timestamp(),
-            transactions: replace(&mut self.current_transactions, vec![]),
-            proof,
-            previous_hash: if let Some(val) = previous_hash { val } else {
-                sha256(serde_json::to_string(self.last_block()).unwrap().as_bytes())
-            },
-        };
-
-        self.chain.push(block);
-        self.last_block()
-    }
-
-    fn new_transaction(&mut self, sender: String, recipient: String, amount: f64) -> u32 {
-        self.current_transactions.push(Transaction {
-            sender,
-            recipient,
-            amount,
-        });
-
-        self.last_block().index as u32 + 1
-    }
-
-    fn last_block(&self) -> &Block { return self.chain.last().unwrap(); }
-
-    pub fn proof_of_work(&self, last_proof: u32) -> u32 {
-        for proof in 0u32.. { if Blockchain::valid_proof(last_proof, proof) { return proof; } }
-
-        unreachable!()
-    }
-
-    fn valid_proof(last_proof: u32, proof: u32) -> bool {
-        &sha256(format!(
-            "{}{}",
-            last_proof,
-            proof
-        ).as_bytes())[0..4] == "0000"
-    }
 }
 
 
-// rocket manager
+// --- rocket manager ---
 type BcMgr = Mutex<Blockchain>;
 type NodeIdentifier = Mutex<String>;
 
-// rocket get route
+// --- rocket get route ---
 #[get("/mine")]
 pub fn mine(bc_mgr: State<BcMgr>, node_identifier: State<NodeIdentifier>) -> Json {
     let mut blockchain = bc_mgr.lock().unwrap();
@@ -200,8 +211,8 @@ pub fn full_chain(bc_mgr: State<BcMgr>) -> Json {
     let chain = &bc_mgr.lock().unwrap().chain;
 
     Json(json!({
-        "chain": chain,
-        "length": chain.len()
+        "chain": chain.chain,
+        "length": chain.length
     }))
 }
 
@@ -213,19 +224,19 @@ pub fn consensus(bc_mgr: State<BcMgr>) -> Json {
     if blockchain.resolve_conflicts() {
         response = json!({
             "message": "Our chain was replaced",
-            "new_chain": blockchain.chain
+            "new_chain": blockchain.chain.chain
         })
     } else {
         response = json!({
             "message": "Our chain is authoritative",
-            "chain": blockchain.chain
+            "chain": blockchain.chain.chain
         })
     }
 
     Json(response)
 }
 
-// rocket get route
+// --- rocket get route ---
 #[post("/transactions/new", format = "application/json", data = "<transaction>")]
 pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
     let Transaction {

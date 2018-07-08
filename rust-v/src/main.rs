@@ -1,10 +1,9 @@
-// marco
+// --- marco ---
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
 
 
-
-// crate
+// --- crate ---
 extern crate reqwest;
 
 extern crate rocket;
@@ -25,20 +24,17 @@ extern crate url;
 extern crate uuid;
 
 
-
-// mod
+// --- mod ---
 mod l_blockchain;
 
 
-
-// use
+// --- use ---
 use std::sync::Mutex;
 
 use uuid::Uuid;
 
 
-
-// main
+// --- main ---
 fn main() {
     rocket::ignite()
         .mount("/", routes![

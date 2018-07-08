@@ -76,7 +76,7 @@ class Blockchain:
         self.current_transactions.append({
             'sender': sender,
             'recipient': recipient,
-            'amount': amount
+            'amount': float(amount)
         })
 
         return self.last_block['index'] + 1
@@ -84,7 +84,7 @@ class Blockchain:
     @staticmethod
     def hash(block):
         return hashlib.sha256(
-            json.dumps(block, sort_keys=True).encode()
+            json.dumps(block, separators=(',', ':'), sort_keys=True).encode()
         ).hexdigest()
 
     @property
