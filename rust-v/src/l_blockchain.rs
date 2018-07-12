@@ -235,7 +235,7 @@ pub fn consensus(bc_mgr: State<BcMgr>) -> Json {
     Json(response)
 }
 
-// --- rocket get route ---
+// --- rocket post route ---
 #[post("/transactions/new", format = "application/json", data = "<transaction>")]
 pub fn new_transaction(transaction: Json<Transaction>, bc_mgr: State<BcMgr>) -> Json {
     let Transaction {
