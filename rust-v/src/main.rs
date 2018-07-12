@@ -1,5 +1,5 @@
 // --- marco ---
-#![feature(plugin, custom_derive)]
+#![feature(custom_derive, plugin)]
 #![plugin(rocket_codegen)]
 
 
